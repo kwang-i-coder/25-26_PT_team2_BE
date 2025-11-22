@@ -1,7 +1,5 @@
 from fastapi.testclient import TestClient
 from app.main import app
-from app.models.auth_models import SignInRequest, SignInResponse
-
 client = TestClient(app)
 
 def test_root():
