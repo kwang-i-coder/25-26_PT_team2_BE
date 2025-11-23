@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17
+    container_name: jandi-postgres
+    ports:
+      - "5432:5432"
+    restart: always  
+    #배포 시 Cloud SQL 연결 설정  
+    environment:
+      - POSTGRES_USER=jandi_user
+      - POSTGRES_PASSWORD=jandi_password
+      - POSTGRES_DB=jandi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:4.2.1-management # 배포시에 용량 크면 일반 버전으로 바꿔도 될듯  
+    container_name: jandi-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # 서비스 간 통신 포트
+      - "15672:15672" # 관리자 웹 UI 포트 (접속: localhost:15672)  
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  main-server:
+    build: ./main_server 
+    container_name: jandi-main-server
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - rabbitmq
+    environment:
+      # 로컬에선 db 컨테이너 주소, 배포 땐 Cloud SQL 주소 넣기
+      - DATABASE_URL=postgresql://jandi_user:jandi_password@db:5432/jandi_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+
+  frontend:
+    build: ./frontend
+    container_name: jandi-frontend
+    command: npm start
+    ports:
+      - "3000:3000" 
+    depends_on:
+      - main-server
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+
+  post-observer:
+    build: ./post_observer 
+    container_name: jandi-observer
+    command: python main.py
+    depends_on:
+      - db
+      - rabbitmq
+    environment:
+      - DATABASE_URL=postgresql://jandi_user:jandi_password@db:5432/jandi_db
+      - RABBITMQ_HOST=rabbitmq
+
+  ai-server:
+    build: ./ai_server 
+    container_name: jandi-ai-worker
+    command: python main.py
+    depends_on:
+      - rabbitmq
+      - db
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - DATABASE_URL=postgresql://jandi_user:jandi_password@db:5432/jandi_db
+      - GEMINI_API_KEY=your_gemini_api_key_here
+
+  mail-server:
+    build: ./mail_server 
+    container_name: jandi-mail-worker
+    command: python main.py
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - SMTP_SERVER=smtp.gmail.com
+      - SMTP_USER=your_email@gmail.com # 여기 메일 담당하시는 분이 수정하시면 됩니다 나중에 배포할때는 secret으로 바꿔야 할 것 같아요!
+      - SMTP_PASSWORD=your_app_password # 여기도요!
+
+# 데이터 영구 저장을 위한 볼륨 정의
+volumes:
+  postgres_data:
+  rabbitmq_data:
