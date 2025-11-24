@@ -69,7 +69,6 @@ def register_platform(
     db.commit()
     
     return {
-        "status": "success", 
-        "message": message, 
+        "message": message
     }
 
