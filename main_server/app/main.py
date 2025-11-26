@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from .routers.auth_router import router as auth_router
 from .dependencies.database import Base, engine, get_db
-from .models import user_models
+from .models import user_models, post_models
 from .routers.platform_router import router as platform_router 
 
 Base.metadata.create_all(bind=engine)
