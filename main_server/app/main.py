@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from app.routers.auth_router import auth_router
-from app.dependencies.database import Base, engine, get_db
-from app.models import user_models
-from app.routers.platform_router import router as platform_router 
+from .routers.auth_router import router as auth_router
+from .dependencies.database import Base, engine, get_db
+from .models import user_models
+from .routers.platform_router import router as platform_router 
 
 Base.metadata.create_all(bind=engine)
 
