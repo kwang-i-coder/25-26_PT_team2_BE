@@ -50,7 +50,6 @@ def create_access_token(user_id: str):
 
 @router.post("/signup")
 async def signup(data: SignUpRequest, db: Session = Depends(get_db)):
-
     # 이메일 중복 검사
     user = db.query(User).filter(User.email == data.email).first()
     if user:
@@ -66,7 +65,7 @@ async def signup(data: SignUpRequest, db: Session = Depends(get_db)):
 
     # 인증용 토큰
     verify_token = jwt.encode(
-        {"sub": str(new_user.user_id), "exp": datetime.utcnow() + timedelta(minutes=30)},
+        {"sub": str(new_user.user_id), "exp": datetime.utcnow() + timedelta(hours=1)},
         SECRET_KEY,
         algorithm=ALGORITHM
     )
@@ -97,7 +96,9 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload["sub"]
-    except:
+    except(jwt.exceptions.ExpiredSignatureError):
+        raise HTTPException(status_code=400, detail="토큰이 만료되었습니다")
+    except(jwt.exceptions.InvalidTokenError):
         raise HTTPException(status_code=400, detail="유효하지 않은 토큰입니다")
 
     shadow = db.query(AuthUser).filter(AuthUser.user_id == user_id).first()
