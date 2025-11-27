@@ -1,50 +1,90 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-from typing import List
+from typing import List, Dict
 import os
 from dotenv import load_dotenv
-from openai import OpenAI  
+from openai import OpenAI
+import re  
 
 load_dotenv()
 
 # Upstage API 설정
-# Upstage는 OpenAI 호환 API를 제공하므로 base_url을 지정하여 사용합니다.
 client = OpenAI(
     api_key=os.environ.get("UPSTAGE_API_KEY"),
     base_url="https://api.upstage.ai/v1/solar"
 )
-UPSTAGE_MODEL = 'solar-1-mini-chat'  # 또는 'solar-pro'
+UPSTAGE_MODEL = 'solar-1-mini-chat'
 
 
-def crawl_webpage(url: str) -> str:
-    """주어진 URL의 웹페이지 내용을 크롤링하여 텍스트로 반환합니다."""
+def normalize_date(date_str: str) -> str:
+    if not date_str:
+        return "날짜 정보 없음"
+    
+    match = re.search(r'(\d{4})[\.\-\/]\s*(\d{1,2})[\.\-\/]\s*(\d{1,2})', date_str)
+    
+    if match:
+        year, month, day = match.groups()
+        return f"{year}-{int(month):02d}-{int(day):02d}"
+    
+    return date_str # 변환 실패 시 원본 반환
+
+
+def crawl_webpage(url: str) -> Dict[str, str]:
     print(f"크롤링 시작: {url}")
+    
+    if "blog.naver.com" in url and "m.blog.naver.com" not in url:
+        url = url.replace("blog.naver.com", "m.blog.naver.com")
+
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
-        title = soup.title.string if soup.title else ""
-        
+
+        # 제목 추출
+        og_title = soup.find('meta', property='og:title')
+        if og_title and og_title.get('content'):
+            title = og_title['content']
+        else:
+            title = soup.title.string if soup.title else "제목 없음"
+
+        # 날짜 추출 (원본 문자열 확보)
+        raw_date = ""
+        published_time = soup.find('meta', property='article:published_time')
+        naver_date = soup.find('p', class_='blog_date')
+        common_date = soup.find(class_='date')
+
+        if published_time and published_time.get('content'):
+            raw_date = published_time['content']
+        elif naver_date:
+            raw_date = naver_date.get_text().strip()
+        elif common_date:
+            raw_date = common_date.get_text().strip()
+            
+        # 날짜 포맷팅 적용 (YYYY-MM-DD)
+        formatted_date = normalize_date(raw_date)
+
+        # 본문 추출
         paragraphs = [p.get_text().strip() for p in soup.find_all('p') if p.get_text().strip()]
         content = " ".join(paragraphs)
 
-        full_text = f"제목: {title}\n본문: {content}"
-        return full_text[:5000]  # 토큰 제한 고려하여 길이 
+        return {
+            "title": title,
+            "date": formatted_date, # 포맷팅된 날짜 반환
+            "content": content[:5000]
+        }
 
     except Exception as e:
         print(f"크롤링 오류 발생: {e}")
-        return ""
+        return {}
 
 
 def classify_topics_with_upstage(text: str) -> List[str]:
-    """텍스트를 분석하여 지정된 5개 카테고리 중 상위 2개를 추출합니다."""
     if not text:
         return []
 
-    # 프롬프트 수정: 5개 카테고리 중 선택하도록 지시, 키워드 하나만 사용하라고 해도 됨
     prompt = (
         "다음 텍스트를 분석하여 아래 5가지 카테고리 중 가장 연관성이 높은 2가지를 선택하세요.\n"
         "1. tech\n"
@@ -58,7 +98,6 @@ def classify_topics_with_upstage(text: str) -> List[str]:
         f"분석할 텍스트:\n---\n{text}"
     )
 
-    print("Upstage Solar API 호출 중...")
     try:
         response = client.chat.completions.create(
             model=UPSTAGE_MODEL,
@@ -70,31 +109,26 @@ def classify_topics_with_upstage(text: str) -> List[str]:
         )
         
         content = response.choices[0].message.content
-        
-        # 쉼표로 분리하여 리스트 반환
-        topics = [
-            topic.strip() 
-            for topic in content.split(',')
-            if topic.strip() 
-        ]
-        
-        return topics[:2] # 상위 2개만 반환
+        topics = [topic.strip() for topic in content.split(',') if topic.strip()]
+        return topics[:2]
 
     except Exception as e:
         print(f"Upstage API 오류 발생: {e}")
         return []
 
-def save_to_db(url: str, topics: List[str]):
+def save_to_db(url: str, title: str, date: str, topics: List[str]):
     if topics:
-        print(f"   - URL: {url}")
-        print(f"   - 주제: {', '.join(topics)}")
+        # print(f"   - 제목: {title}")
+        # print(f"   - 날짜: {date}") # YYYY-MM-DD 형식
+        # print(f"   - URL : {url}")
+        # print(f"   - 주제: {', '.join(topics)}")
+        pass
     else:
-        print(f"저장 건너뜀: {url} (주제 없음)")
+        # print(f"저장 건너뜀: {url} (주제 없음)")
+        pass
 
 
 def consume_message_queue():
-    print("--- 메시지 큐 구독 및 소비 루틴 시작 ---")
-
     sample_links = [
         "https://blog.naver.com/gurwn1725/224009540423", 
         "https://zio2017.tistory.com/99", 
@@ -102,15 +136,21 @@ def consume_message_queue():
 
     for link in sample_links:
         print("\n========================================")
-        crawled_text = crawl_webpage(link)
+        crawled_data = crawl_webpage(link)
         
-        if crawled_text:
-            topics = classify_topics_with_upstage(crawled_text)
-            save_to_db(link, topics)
+        content = crawled_data.get("content", "")
+        title = crawled_data.get("title", "")
+        date = crawled_data.get("date", "")
+
+        if content:
+            input_text = f"제목: {title}\n본문: {content}"
+            topics = classify_topics_with_upstage(input_text)
+            
+            save_to_db(link, title, date, topics)
         else:
             print("크롤링 된 텍스트가 없어 건너뜁니다.")
 
-        time.sleep(2) # API 속도 제한 고려
+        time.sleep(2) 
 
     print("\n--- 모든 시뮬레이션 메시지 처리 완료 ---")
 
