@@ -35,4 +35,3 @@ class POST_AGG(Base):
         primary_key=True,
     )
     count = Column(Integer, nullable=False)
-    
