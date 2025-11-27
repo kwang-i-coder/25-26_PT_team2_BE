@@ -24,17 +24,17 @@ services:
       - rabbitmq
     env_file:
       - .env
-
-  frontend:
-    build: ./frontend
-    container_name: jandi-frontend
-    command: npm start
-    ports:
-      - "3000:3000"
-    depends_on:
-      - main-server
-    env_file:
-      - .env
+  # 프론트엔드 서비스 빌드할 때 에러가 나는 것 같습니다. 추후 해결하고 주석 풀어야할 것 같아요
+  # frontend:
+  #   build: ./frontend
+  #   container_name: jandi-frontend
+  #   command: npm start
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - main-server
+  #   env_file:
+  #     - .env
 
   post-observer:
     build: ./post_observer
