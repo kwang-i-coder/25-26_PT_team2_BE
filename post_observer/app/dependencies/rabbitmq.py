@@ -55,7 +55,7 @@ def publish_message(queue_name: str, message: Dict[str, Any]):
         channel = connection.channel()
 
         # 큐 선언 (존재하지 않으면 생성)
-        channel.queue_declare(queue=queue_name, durable=True)
+        channel.queue_declare(queue=queue_name, durable=False)
 
         # 메시지 발행
         channel.basic_publish(
@@ -67,7 +67,7 @@ def publish_message(queue_name: str, message: Dict[str, Any]):
             )
         )
 
-        logger.info(f"Published message to queue '{queue_name}': {message.get('article', {}).get('title', 'N/A')}")
+        # logger.info(f"Published message to queue '{queue_name}': {message.get('article', {}).get('title', 'N/A')}")
 
     except Exception as e:
         logger.error(f"Failed to publish message to RabbitMQ: {e}")
