@@ -1,6 +1,7 @@
 from typing import List
 from sqlalchemy.orm import Session
-from app.models.db_models import UserPlatform, Platform
+from datetime import datetime, timedelta
+from app.models.db_models import UserPlatform, Platform, User
 from app.dependencies.database import SessionLocal
 import logging
 
@@ -16,6 +17,19 @@ class UserPlatformInfo:
 
     def __repr__(self):
         return f"UserPlatformInfo(user_id={self.user_id}, platform={self.platform_name}, account_id={self.account_id})"
+
+class InactiveUserInfo:
+    """미업로드 사용자 정보 DTO"""
+    def __init__(self, user_id, email, name, platform_name, last_upload, days_inactive):
+        self.user_id = user_id
+        self.email = email
+        self.name = name
+        self.platform_name = platform_name
+        self.last_upload = last_upload
+        self.days_inactive = days_inactive
+
+    def __repr__(self):
+        return f"InactiveUserInfo(user_id={self.user_id}, email={self.email}, days_inactive={self.days_inactive})"
 
 def get_all_user_platforms() -> List[UserPlatformInfo]:
     """
@@ -51,6 +65,56 @@ def get_all_user_platforms() -> List[UserPlatformInfo]:
 
     except Exception as e:
         logger.error(f"Failed to fetch user platforms: {e}")
+        return []
+    finally:
+        db.close()
+
+def get_inactive_users(days: int = 30) -> List[InactiveUserInfo]:
+    """
+    1달 이상 글을 올리지 않은 사용자 조회
+
+    Args:
+        days: 기준 일수 (기본값: 30일)
+
+    Returns:
+        List[InactiveUserInfo]: 미업로드 사용자 정보 리스트
+    """
+    db = SessionLocal()
+    try:
+        cutoff_date = datetime.now() - timedelta(days=days)
+
+        # USER_PLATFORM, PLATFORM, USER 3-way JOIN
+        results = db.query(
+            UserPlatform.user_id,
+            User.email,
+            User.name,
+            Platform.name.label('platform_name'),
+            UserPlatform.last_upload
+        ).join(
+            Platform, UserPlatform.platform_id == Platform.platform_id
+        ).join(
+            User, UserPlatform.user_id == User.user_id
+        ).filter(
+            UserPlatform.last_upload < cutoff_date
+        ).all()
+
+        inactive_users = [
+            InactiveUserInfo(
+                user_id=row.user_id,
+                email=row.email,
+                name=row.name,
+                platform_name=row.platform_name,
+                last_upload=row.last_upload,
+                days_inactive=(datetime.now() - row.last_upload).days if row.last_upload else None
+            )
+            for row in results
+        ]
+
+        logger.info(f"Found {len(inactive_users)} inactive users (>{days} days)")
+        return inactive_users
+
+    except Exception as e:
+        logger.error(f"Failed to fetch inactive users: {e}")
         return []
     finally:
         db.close()
