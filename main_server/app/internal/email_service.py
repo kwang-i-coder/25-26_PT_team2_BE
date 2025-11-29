@@ -27,7 +27,7 @@ async def send_verification_email(email: str, token: str) -> None:
     if not SMTP_USER or not SMTP_PASSWORD:
         raise RuntimeError("SMTP_USER 또는 SMTP_PASSWORD가 설정되지 않았습니다. .env를 확인하세요.")
 
-    verify_url = f"{FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+    verify_url = f"{FRONTEND_URL.rstrip('/')}/api/auth/verify-email?token={token}"
 
     html_body = f"""
     <html>
