@@ -83,6 +83,16 @@ def check_new_posts():
 
     logger.info(f"=== Finished check: {total_new_posts} new posts found ===")
 
+    # refresh 큐에 새 글 전체 개수 발행
+    publish_message(
+        queue_name="refresh",
+        message={
+            "type": "init",
+            "count": total_new_posts
+        }
+    )
+    logger.info(f"Published refresh message: count={total_new_posts}")
+
 def check_inactive_users():
     """
     1달 이상 글을 올리지 않은 사용자 조회 및 독촉 메일 발행
