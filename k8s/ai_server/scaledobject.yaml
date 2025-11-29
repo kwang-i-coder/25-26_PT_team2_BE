@@ -11,7 +11,7 @@ spec:
   triggers:
   - type: rabbitmq
     metadata:
-      queueName: ai_task_queue  # 코드에서 쓰는 큐 이름
+      queueName: new_posts  # 코드에서 쓰는 큐 이름
       mode: QueueLength
       value: "1"
     authenticationRef:
