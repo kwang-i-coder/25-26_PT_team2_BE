@@ -1,159 +1,125 @@
-import requests
-from bs4 import BeautifulSoup
-import time
-from typing import List, Dict
+import pika
+import json
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
-import re  
+import ssl
+import logging
+from enum import Enum
+from service import consume_message_queue, refresh_materialized_view
+from dependencies.database import Base, engine
+from models.models import Posts
+from pika.channel import Channel
 
-load_dotenv()
+Base.metadata.create_all(bind=engine)
 
-# Upstage API 설정
-client = OpenAI(
-    api_key=os.environ.get("UPSTAGE_API_KEY"),
-    base_url="https://api.upstage.ai/v1/solar"
+load_dotenv('../.env')
+
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
 )
-UPSTAGE_MODEL = 'solar-1-mini-chat'
 
 
-def normalize_date(date_str: str) -> str:
-    if not date_str:
-        return "날짜 정보 없음"
-    
-    match = re.search(r'(\d{4})[\.\-\/]\s*(\d{1,2})[\.\-\/]\s*(\d{1,2})', date_str)
-    
-    if match:
-        year, month, day = match.groups()
-        return f"{year}-{int(month):02d}-{int(day):02d}"
-    
-    return date_str # 변환 실패 시 원본 반환
+total_article_count = 0
+current_article_count = 0
 
 
-def crawl_webpage(url: str) -> Dict[str, str]:
-    print(f"크롤링 시작: {url}")
+# 오타 방지
+class Channels(Enum):
+    NEW_POSTS = 'new_posts'
+    REFRESH = 'refresh'
+
+
+def get_rabbitmq_connection():
     
-    if "blog.naver.com" in url and "m.blog.naver.com" not in url:
-        url = url.replace("blog.naver.com", "m.blog.naver.com")
+    """
+    RabbitMQ 연결 생성
+
+    Returns:
+        pika.BlockingConnection: RabbitMQ 연결 객체
+    """
+    rabbitmq_url = os.getenv("RABBITMQ_HOST")
+
+    if not rabbitmq_url:
+        raise ValueError("RABBITMQ_HOST environment variable not set")
 
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
+        # URL 파싱하여 연결 파라미터 생성
+        params = pika.URLParameters(rabbitmq_url)
 
-        soup = BeautifulSoup(response.content, 'html.parser')
+        # SSL 인증서 검증 비활성화 (CloudAMQP 연결용)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        params.ssl_options = pika.SSLOptions(ssl_context)
 
-        # 제목 추출
-        og_title = soup.find('meta', property='og:title')
-        if og_title and og_title.get('content'):
-            title = og_title['content']
-        else:
-            title = soup.title.string if soup.title else "제목 없음"
-
-        # 날짜 추출 (원본 문자열 확보)
-        raw_date = ""
-        published_time = soup.find('meta', property='article:published_time')
-        naver_date = soup.find('p', class_='blog_date')
-        common_date = soup.find(class_='date')
-
-        if published_time and published_time.get('content'):
-            raw_date = published_time['content']
-        elif naver_date:
-            raw_date = naver_date.get_text().strip()
-        elif common_date:
-            raw_date = common_date.get_text().strip()
-            
-        # 날짜 포맷팅 적용 (YYYY-MM-DD)
-        formatted_date = normalize_date(raw_date)
-
-        # 본문 추출
-        paragraphs = [p.get_text().strip() for p in soup.find_all('p') if p.get_text().strip()]
-        content = " ".join(paragraphs)
-
-        return {
-            "title": title,
-            "date": formatted_date, # 포맷팅된 날짜 반환
-            "content": content[:5000]
-        }
-
+        connection = pika.BlockingConnection(params)
+        return connection
     except Exception as e:
-        print(f"크롤링 오류 발생: {e}")
-        return {}
+        logger.error(f"Failed to connect to RabbitMQ: {e}")
+        raise
 
 
-def classify_topics_with_upstage(text: str) -> List[str]:
-    if not text:
-        return []
 
-    prompt = (
-        "다음 텍스트를 분석하여 아래 5가지 카테고리 중 가장 연관성이 높은 2가지를 선택하세요.\n"
-        "1. tech\n"
-        "2. life\n"
-        "3. food\n"
-        "4. travel\n"
-        "5. review\n\n"
-        "반드시 위 목록에 있는 단어만 사용해야 하며, 가장 가능성이 높은 순서대로 2개를 쉼표(,)로 구분하여 출력하세요.\n"
-        "다른 설명이나 문장은 절대 포함하지 마세요.\n"
-        "예시: tech, review\n\n"
-        f"분석할 텍스트:\n---\n{text}"
-    )
+def publish_progress(ch):
+    msg = json.dumps({"type": "progress"}, ensure_ascii=False)
+    ch.basic_publish(exchange='', routing_key=Channels.REFRESH.value, body=msg)
+
+def callback_new_posts(ch: Channel, method, properties, body):
+    data = json.loads(body)
+    logger.info(f"Received message: {data}")
+    logger.info(f"type: {type(data)}")
+    try:
+        consume_message_queue(data['article']['link'], data['user_id'], data['platform'], data['article']['published_at'])
+        publish_progress(ch)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as e:
+        logger.error(f"Failed to process message(new_posts): {e}")
+        # 실패한 경우라도 카운팅은 해야하니 publish_progress(ch)를 호출
+        publish_progress(ch)
+        ch.basic_nack(delivery_tag=method.delivery_tag)
+        return
+    
+
+def callback_refresh(ch: Channel, method, properties, body):
+    global total_article_count, current_article_count
+    data = json.loads(body)
+    logger.info(f"Received message: {data}")
 
     try:
-        response = client.chat.completions.create(
-            model=UPSTAGE_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a text classifier. Output only the category names."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1
-        )
-        
-        content = response.choices[0].message.content
-        topics = [topic.strip() for topic in content.split(',') if topic.strip()]
-        return topics[:2]
+        msg_type = data.get('type')
+
+        if msg_type == 'init':
+            total_article_count = data['count']
+            current_article_count = 0
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        current_article_count += 1
+        logger.info(f"Current article count: {current_article_count}")
+        logger.info(f"Total article count: {total_article_count}")
+        if current_article_count == total_article_count:
+            logger.info("All articles processed")
+            refresh_materialized_view()
+            logger.info("Materialized view refreshed")
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     except Exception as e:
-        print(f"Upstage API 오류 발생: {e}")
-        return []
-
-def save_to_db(url: str, title: str, date: str, topics: List[str]):
-    if topics:
-        # print(f"   - 제목: {title}")
-        # print(f"   - 날짜: {date}") # YYYY-MM-DD 형식
-        # print(f"   - URL : {url}")
-        # print(f"   - 주제: {', '.join(topics)}")
-        pass
-    else:
-        # print(f"저장 건너뜀: {url} (주제 없음)")
-        pass
+        logger.error(f"Failed to process message(refresh): {e}")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 
-def consume_message_queue():
-    sample_links = [
-        "https://blog.naver.com/gurwn1725/224009540423", 
-        "https://zio2017.tistory.com/99", 
-    ]
-
-    for link in sample_links:
-        print("\n========================================")
-        crawled_data = crawl_webpage(link)
-        
-        content = crawled_data.get("content", "")
-        title = crawled_data.get("title", "")
-        date = crawled_data.get("date", "")
-
-        if content:
-            input_text = f"제목: {title}\n본문: {content}"
-            topics = classify_topics_with_upstage(input_text)
-            
-            save_to_db(link, title, date, topics)
-        else:
-            print("크롤링 된 텍스트가 없어 건너뜁니다.")
-
-        time.sleep(2) 
-
-    print("\n--- 모든 시뮬레이션 메시지 처리 완료 ---")
+def start_worker():
+    channel = get_rabbitmq_connection().channel()
+    channel.queue_declare(queue=Channels.NEW_POSTS.value)
+    channel.basic_consume(queue=Channels.NEW_POSTS.value, on_message_callback=callback_new_posts)
+    channel.queue_declare(queue=Channels.REFRESH.value)
+    channel.basic_consume(queue=Channels.REFRESH.value, on_message_callback=callback_refresh)
+    channel.start_consuming()
 
 
-if __name__ == "__main__":
-    consume_message_queue()
+start_worker()
