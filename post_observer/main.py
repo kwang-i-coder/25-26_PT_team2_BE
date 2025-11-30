@@ -26,7 +26,7 @@ def main():
 
     # 미업로드 사용자 체크
     logger.info("Running check_inactive_users...")
-    check_inactive_users()
+    check_inactive_users() #여기서 rabbitmq메시지 발행됨
 
     logger.info("=" * 60)
     logger.info("Post Observer Service Completed")

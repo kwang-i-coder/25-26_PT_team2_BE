@@ -1,80 +1,96 @@
-# mail_server/main.py
-#워커진입점, api서버
-
-import uvicorn
-from fastapi import FastAPI
 import os
+import json
 import logging
-import threading 
-import time
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from dotenv import load_dotenv 
+import smtplib
+from rabbitmq import get_connection, start_consumer
+import sys
+from email.mime.text import MIMEText
 
-# Pika컨슈머 로직
-from .consumer import start_pika_consumer 
-from .scheduler_service import (check_and_publish_inactivity,
-    check_and_publish_inactivity, 
-    init_db_pool,
-    close_db_pool 
+#환경변수
+RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'localhost')
+SMTP_SERVER = os.environ.get("SMTP_SERVER")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+SMTP_USER = os.environ.get("SMTP_USER")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+
+rabbitmq_url = os.getenv("RABBITMQ_HOST")
+sender_email = SMTP_USER
+
+#로깅설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
 )
-
-
-# 환경 변수 로드 (.env 파일 사용)
-load_dotenv() 
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI 애플리케이션 인스턴스 생성
-app = FastAPI(
-    title="Mail Worker API",
-    version="1.0.0",
-)
+#메일보내는 함수
+def send_email(recipient: str, subject: str, body_content: str):
+    try:
+        msg = MIMEText(body_content)
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = recipient
 
-scheduler = AsyncIOScheduler()
+        logger.info(f"[SMTP] Connecting to {SMTP_SERVER}...")
 
-#fast api이벤트 핸들러
-#fast api가 비동기 메인 스레드라 그거 블로킹 안하려고 
-#동기 방식인 pika 컨슈머를 별도 백그라운드 스레드로 분리
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(sender_email, recipient, msg.as_string())
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info(f"🚀 Mail Worker is starting FastAPI server...")
+            logger.info(f"[SMTP] Email sent seccessfully to {recipient}")
+        
+    except smtplib.SMTPAuthenticationError:
+        logger.error("SMTP 인증 실패: 사용자 이름/비밀번호를 확인하세요.")
+    except smtplib.SMTPException as e:
+        logger.info(f"SMTP 전송 중 오류 발생: {e}")
+    except Exception as e:
+        logger.error(f"예상치 못한 오류 발생: {e}", exc_info=True)
 
-    # Psycopg3 DB Pool 초기화 추가
-    await init_db_pool()
 
-    #분리된 백그라운드 스레드로. 
-    threading.Thread(target=start_pika_consumer, daemon=True).start()
-    logger.info("🔗 RabbitMQ Consumer started in a background thread.")
+#콜백 함수 정의
+def mail_reminder_callback(ch, method, properties, body):
+    #메시지 처리 흐름 제어, send mail함수 호출
+    try:
+        message_data = json.loads(body.decode('utf-8'))
 
-    #APScheduler 스케줄러 시작
-    scheduler.add_job(check_and_publish_inactivity, 'cron', hour=3, minute=0, id='inactivity_check')
-    scheduler.start()
-    logger.info("⏰ Inactivity check scheduler started.")
+        user_email = message_data.get("email")
+        user_name = message_data.get("name", "사용자")
+        days_inactive = message_data.get("days_inactive")
 
-#서버 종료 시 호출됨
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("🛑 Service Stopping...")
-    if scheduler.running:
-        scheduler.shutdown()
-    await close_db_pool()
+        if not user_email:
+            logger.error(f"메시지에 이메일 정보가 없습니다. 데이터: {message_data}")
+            return
+        
+        subject = f"[jandi] {user_name}님, 잔디밭이 비고 있어요! "
+        body_content = (
+            f"안녕하세요, {user_name}님. \n 마지막 활동 이후 벌써 {days_inactive}일이 지났습니다. "
+            f"새 글을 써서 잔디밭을 채우러 가 볼까요?"
+        )
 
-#상태 확인 엔드포인트
-#외부의 로드밸런서가 확인할 수 있다고 함
-@app.get("/health", tags=["status"])
-async def read_health():
-    return {"status": "ok", "message": "Mail Worker is running"}
+        send_email(recipient = user_email, subject = subject, body_content=body_content)
 
-#프로그램 진입
-#uvicorn호출해서 fast api서버와 비동기 이벤트 루프 시작
+    except json.JSONDecodeError:
+        logger.error(f"메시지 파싱 실패: 잘못된 JSON형식 - Body : {body}")
+    except Exception as e:
+        logger.error(f"메시지 처리 중 예외 발생: {e}", exc_info=True)
+    finally:
+        ch.basic_ack(delivery_tag = method.delivery_tag)
+        logger.info(f"ACK send for delivery tag: {method.delivery_tag}")
 
+
+#프로그램 실행
 if __name__ == "__main__":
-    #서버구동
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=False 
-    )
+    if not os.environ.get("SMTP_SERVER"):
+        logger.critical("SMRP_SERVER가 설정되지 않았습니다. 메일 발송 기능이 작동하지 않습니다.")
+
+    MAIL_QUEUE = "mail_reminders"
+    
+    logger.info("소비자 서버 초기화 중...")
+
+    try:
+        start_consumer(rabbitmq_url,MAIL_QUEUE, mail_reminder_callback)
+    except Exception as e:
+        logger.critical(f"소비자 서버 실행 중 치명적 오류 발생: {e}")
