@@ -51,11 +51,12 @@ services:
       - .env
 
   mail-server:
-    build: ./mail_server 
+    build: ./mail_server
     container_name: jandi-mail-worker
     command: python3 -u main.py
     env_file:
       - .env
+
 
 # 데이터 영구 저장을 위한 볼륨 정의
 volumes:

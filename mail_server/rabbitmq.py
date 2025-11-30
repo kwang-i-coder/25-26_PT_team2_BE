@@ -60,13 +60,15 @@ def start_consumer(rabbitmq_url:str, queue_name: str, callback_function):
         channel.basic_consume(queue_name,
             #콜백함수, 메시지 들어오면 pika가 그걸 인수로 콜백함수 호출
             on_message_callback=callback_function, 
-            auto_ack=True)
+            auto_ack=False)
         
         logger.info(f' [*] 큐 "{queue_name}"에서 메시지 대기 중. 종료하려면 CTRL+C를 누르세요.')
         channel.start_consuming() #무한루프시작
         
     except KeyboardInterrupt:
         logger.info("사용자에 의해 소비 종료 요청.")
+    except pika.exceptions.ChannelClosedByBroker as e:
+        logger.error(f"🚨 채널 닫힘 오류: {e}. Worker를 재시작해야 합니다.")
     except Exception as e:
         logger.error(f"소비자 실행 중 치명적인 오류 발생: {e}")
         raise

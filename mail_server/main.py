@@ -53,6 +53,8 @@ def send_email(recipient: str, subject: str, body_content: str):
 #콜백 함수 정의
 def mail_reminder_callback(ch, method, properties, body):
     #메시지 처리 흐름 제어, send mail함수 호출
+    ack_needed = True # ACK 상태 플래그
+    requeue = False # 재처리 요청 플래그
     try:
         message_data = json.loads(body.decode('utf-8'))
 
@@ -62,23 +64,32 @@ def mail_reminder_callback(ch, method, properties, body):
 
         if not user_email:
             logger.error(f"메시지에 이메일 정보가 없습니다. 데이터: {message_data}")
-            return
+            requeue = False
         
-        subject = f"[jandi] {user_name}님, 잔디밭이 비고 있어요! "
-        body_content = (
-            f"안녕하세요, {user_name}님. \n 마지막 활동 이후 벌써 {days_inactive}일이 지났습니다. "
-            f"새 글을 써서 잔디밭을 채우러 가 볼까요?"
-        )
+        else:
+            subject = f"[jandi] {user_name}님, 잔디밭이 비고 있어요! "
+            body_content = (
+                f"안녕하세요, {user_name}님. \n 마지막 활동 이후 벌써 {days_inactive}일이 지났습니다. "
+                f"새 글을 써서 잔디밭을 채우러 가 볼까요?"
+            )
 
-        send_email(recipient = user_email, subject = subject, body_content=body_content)
+            send_email(recipient = user_email, subject = subject, body_content=body_content)
 
     except json.JSONDecodeError:
         logger.error(f"메시지 파싱 실패: 잘못된 JSON형식 - Body : {body}")
+        requeue = True
     except Exception as e:
         logger.error(f"메시지 처리 중 예외 발생: {e}", exc_info=True)
+        requeue = True
     finally:
-        ch.basic_ack(delivery_tag = method.delivery_tag)
-        logger.info(f"ACK send for delivery tag: {method.delivery_tag}")
+        if requeue:
+            # 오류가 발생했거나 재처리할 필요가 있을 때 NACK 호출 (메시지 큐로 되돌림)
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+            logger.warning(f"NACK sent for delivery tag: {method.delivery_tag}. 메시지를 큐로 돌려보냄.")
+        elif ack_needed:
+            # 정상적으로 처리 완료되었을 때 ACK 호출
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            logger.info(f"ACK sent for delivery tag: {method.delivery_tag}")
 
 
 #프로그램 실행
@@ -94,3 +105,4 @@ if __name__ == "__main__":
         start_consumer(rabbitmq_url,MAIL_QUEUE, mail_reminder_callback)
     except Exception as e:
         logger.critical(f"소비자 서버 실행 중 치명적 오류 발생: {e}")
+    
