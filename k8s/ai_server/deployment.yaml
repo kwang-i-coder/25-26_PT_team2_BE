@@ -19,6 +19,6 @@ spec:
         image: gcr.io/프로젝트ID/ai-server:latest # GKE 레지스트리 주소
         ports:
         - containerPort: 8080 
-        env: 
-        - name: DB_HOST
-          value: "postgres-service"
+        envFrom:
+        - secretRef:
+            name: jandi-secret

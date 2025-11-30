@@ -5,7 +5,7 @@ metadata:
   labels:
     app: main-server
 spec:
-  replicas: 1 
+  replicas: 2
   selector:
     matchLabels:
       app: main-server
@@ -20,6 +20,6 @@ spec:
 
         ports:
         - containerPort: 8080 
-        env: 
-        - name: DB_HOST
-          value: "postgres-service"
+        envFrom:
+        - secretRef:
+            name: jandi-secret
