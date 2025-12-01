@@ -2,66 +2,61 @@ version: '3.8'
 
 services:
 
-  rabbitmq:
-    image: rabbitmq:4.2.1-management # 배포시에 용량 크면 일반 버전으로 바꿔도 될듯  
-    container_name: jandi-rabbitmq
-    restart: always
-    ports:
-      - "5672:5672" # 서비스 간 통신 포트
-      - "15672:15672" # 관리자 웹 UI 포트 (접속: localhost:15672)  
-    env_file:
-      - .env
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+  # rabbitmq:
+  #   image: rabbitmq:4.2.1-management # 배포시에 용량 크면 일반 버전으로 바꿔도 될듯  
+  #   container_name: jandi-rabbitmq
+  #   restart: always
+  #   ports:
+  #     - "5672:5672" # 서비스 간 통신 포트
+  #     - "15672:15672" # 관리자 웹 UI 포트 (접속: localhost:15672)  
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - rabbitmq_data:/var/lib/rabbitmq
 
   main-server:
-    build: ./main_server
+    build: ./main_server 
     container_name: jandi-main-server
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
-    depends_on:
-      - rabbitmq
     env_file:
       - .env
-
-  frontend:
-    build: ./frontend
-    container_name: jandi-frontend
-    command: npm start
-    ports:
-      - "3000:3000"
-    depends_on:
-      - main-server
-    env_file:
-      - .env
+  # 프론트엔드 서비스 빌드할 때 에러가 나는 것 같습니다. 추후 해결하고 주석 풀어야할 것 같아요
+  # frontend:
+  #   build: ./frontend
+  #   container_name: jandi-frontend
+  #   command: npm start
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - main-server
+  #   env_file:
+  #     - .env
 
   post-observer:
-    build: ./post_observer
+    build: ./post_observer 
     container_name: jandi-observer
-    command: python main.py
+    command: python3 -u main.py #test_publish_new_posts.py
     depends_on:
-      - rabbitmq
+      - ai-server
     env_file:
       - .env
 
   ai-server:
     build: ./ai_server
-    container_name: jandi-ai-worker
-    command: python main.py
-    depends_on:
-      - rabbitmq
+    container_name: jandi-ai-server
+    command: python3 -u main.py
     env_file:
       - .env
 
   mail-server:
     build: ./mail_server
     container_name: jandi-mail-worker
-    command: python main.py
-    depends_on:
-      - rabbitmq
+    command: python3 -u main.py
     env_file:
       - .env
+
 
 # 데이터 영구 저장을 위한 볼륨 정의
 volumes:

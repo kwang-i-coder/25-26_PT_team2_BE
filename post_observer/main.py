@@ -1,16 +1,36 @@
-import time
 import os
+import logging
+from dotenv import load_dotenv
+from app.services.observer_service import check_new_posts, check_inactive_users
 
-# 컨테이너가 시작될 때 로그 출력
-print(f"🚀 Service Started: {os.getenv('HOSTNAME', 'Worker')}")
+# 환경변수 로드
+load_dotenv()
 
-try:
-    # 무한 루프를 돌면서 프로세스가 죽지 않게 함
-    while True:
-        # 60초마다 한 번씩만 깨어남 (CPU 낭비 방지)
-        time.sleep(60)
-        # 살아있다는 생존 신고 로그 (선택 사항)
-        print("💤 Worker is idle... waiting for real code implementation.")
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
-except KeyboardInterrupt:
-    print("🛑 Service Stopping...")
+logger = logging.getLogger(__name__)
+
+def main():
+    """Post Observer 메인 실행 함수 (인프라 크론잡에서 호출)"""
+    logger.info("=" * 60)
+    logger.info("Post Observer Service Starting...")
+    logger.info("=" * 60)
+
+    # 새 글 체크
+    logger.info("Running check_new_posts...")
+    check_new_posts()
+
+    # 미업로드 사용자 체크
+    logger.info("Running check_inactive_users...")
+    check_inactive_users() #여기서 rabbitmq메시지 발행됨
+
+    logger.info("=" * 60)
+    logger.info("Post Observer Service Completed")
+    logger.info("=" * 60)
+
+if __name__ == "__main__":
+    main()

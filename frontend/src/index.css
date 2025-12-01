@@ -1,0 +1,23 @@
+/* src/index.css 파일을 이 내용으로 교체하세요 */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* 여기를 바꿔서 흰색 배경으로 만듭니다 */
+  color-scheme: light;
+  color: #333333; /* 글자색: 진한 회색 */
+  background-color: #ffffff; /* 배경색: 흰색 */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  /* display: flex; place-items: center; <-- 중앙 정렬이 싫으면 이 줄을 지우세요 */
+  min-width: 320px;
+  min-height: 100vh;
+}

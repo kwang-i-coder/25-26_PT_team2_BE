@@ -1,0 +1,15 @@
+# FastAPI 서버 및 비동기 환경을 위한 기본 패키지
+fastapi==0.110.1
+uvicorn[standard]==0.29.0
+
+# RabbitMQ 메시지 소비를 위한 패키지
+pika==1.3.2
+
+# PostgreSQL 비동기 접근 (psycopg3)
+psycopg[binary,pool]
+
+# 스케줄러
+apscheduler==3.10.1
+
+# 환경 변수 로딩
+python-dotenv

@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "echo '아직 코드가 없습니다. 대기모드로 진입합니다.' && tail -f /dev/null"
+    "start": "echo '아직 코드가 없습니다. 대기모드로 진입합니다.' && tail -f /dev/null",
+    "dev":"vite"
   },
   "keywords": [],
   "author": "",
