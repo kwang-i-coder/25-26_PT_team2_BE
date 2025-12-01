@@ -32,6 +32,44 @@
         .legend-item { display: flex; align-items: center; gap: 8px; }
         .legend-color { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
+
+/* --- [추가됨] 커스텀 툴팁 스타일 --- */
+        .custom-tooltip {
+            position: absolute;
+            background-color: #1f2937; /* 다크 그레이 */
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none; /* 마우스 이벤트가 툴팁을 통과하도록 설정 */
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(10px);
+        }
+        .custom-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .tooltip-date {
+            color: #9ca3af; /* 연한 회색 */
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        .tooltip-count {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
         @media (max-width: 600px) {
             .content-wrapper { flex-direction: column; align-items: center; gap: 30px; }
             .legend { padding-top: 0; }
@@ -155,10 +193,42 @@
                 grassData.forEach(day => {
                     const dayCell = document.createElement('div');
                     const topicClass = day.topic ? day.topic.toLowerCase() : ''; 
+
+                    
                     dayCell.className = `day-cell ${topicClass}`;
-                    const dayOfWeek = new Date(day.date).getDay();
-                    const topicText = day.topic ? ` - ${day.topic}` : ' - 활동 없음';
-                    dayCell.title = `${day.date} (${WEEKDAYS[dayOfWeek]})` + topicText;
+
+
+
+                    // --- 툴팁 이벤트 리스너 추가 ---
+                    dayCell.addEventListener('mouseenter', (e) => {
+                        // 1. 툴팁 내용 설정 (날짜와 개수만 표시)
+                        const topicColor = day.topic ? getComputedStyle(dayCell).backgroundColor : '#ebedf0';
+                        const countText = day.count > 0 ? `${day.count}개의 글` : '글 없음';
+                        
+                        tooltip.innerHTML = `
+                            <div class="tooltip-date">${day.year}년 ${day.month}월 ${day.day}일</div>
+                            <div style="display:flex; align-items:center;">
+                                <span class="dot" style="background-color: ${day.count > 0 ? topicColor : '#9ca3af'}"></span>
+                                <span class="tooltip-count">${countText}</span>
+                            </div>
+                        `;
+
+                        // 2. 툴팁 위치 계산 (셀 바로 위)
+                        const rect = dayCell.getBoundingClientRect();
+                        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                        
+                        // 툴팁을 셀의 중앙 상단에 위치시킴
+                        tooltip.style.left = `${rect.left + scrollLeft - (tooltip.offsetWidth / 2) + (rect.width / 2)}px`;
+                        tooltip.style.top = `${rect.top + scrollTop - tooltip.offsetHeight - 10}px`;
+                        
+                        tooltip.classList.add('visible');
+                    });
+
+                    dayCell.addEventListener('mouseleave', () => {
+                        tooltip.classList.remove('visible');
+                    });
+
                     grassBoard.appendChild(dayCell);
                 });
             };
