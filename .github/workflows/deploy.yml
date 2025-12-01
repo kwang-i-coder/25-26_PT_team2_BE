@@ -1,0 +1,63 @@
+name: Build and Push 5 Services to GCR
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  PROJECT_ID: calm-scarab-478705-c7  # [변경필요] 본인의 GCP 프로젝트 ID로 꼭 변경하세요!
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    # [Matrix 전략] 5개의 이미지를 동시에 병렬로 빌드합니다. (시간 단축)
+    strategy:
+      fail-fast: false # 하나가 실패해도 나머지는 계속 진행
+      matrix:
+        service: 
+          - ai_server
+          - frontend
+          - mail_server
+          - main_server
+          - post_observer
+
+    steps:
+    # 1. 소스 코드 체크아웃
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. 구글 클라우드 인증 (GitHub Secrets에 등록된 키 사용)
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    # 3. gcloud CLI 설정
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v2'
+
+    # 4. Docker가 GCR에 접근할 수 있도록 인증 설정
+    - name: 'Configure Docker'
+      run: |
+        gcloud auth configure-docker
+
+    # 5. 각 서비스별 빌드 및 푸시
+    # - context: ./${{ matrix.service }} (각 폴더 안의 Dockerfile을 사용)
+    # - tag: latest 태그와 commit hash 태그를 둘 다 돱니다.
+    - name: 'Build and Push ${{ matrix.service }}'
+      run: |
+        # 이미지 주소 변수 설정
+        IMAGE_URI="gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}"
+        
+        echo "Building $IMAGE_URI from ./${{ matrix.service }}..."
+        
+        # 빌드
+        docker build -t $IMAGE_URI:${{ github.sha }} \
+                     -t $IMAGE_URI:latest \
+                     ./${{ matrix.service }}
+        
+        # 푸시
+        docker push $IMAGE_URI:${{ github.sha }}
+        docker push $IMAGE_URI:latest
