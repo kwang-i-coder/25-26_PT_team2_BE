@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: post-observer
 spec:
-  schedule: "0 9 * * *" # 매일 오전 9시 (UTC 기준 확인 필요) 실행
+  schedule: "0 9 * * *" # 매일 오전 9시 (UTC 기준 확인 필요) 실행 -> 한국기준 18시에 실행한다고 함
   jobTemplate:
     spec:
       template:

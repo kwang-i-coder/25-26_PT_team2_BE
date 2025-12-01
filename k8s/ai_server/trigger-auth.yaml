@@ -8,8 +8,7 @@ spec:
   - parameter: host
     name: jandi-secret
     key: RABBITMQ_HOST 
-    name: jandi-secret
-    key: RABBITMQ_USER 
+    
   - parameter: password
     name: jandi-secret
     key: RABBITMQ_PASS 
