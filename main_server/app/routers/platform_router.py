@@ -47,3 +47,18 @@ def register_platform(
     return {
         "message": message
     }
+
+@router.get("/")
+def get_platforms(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+    ):
+    user_platforms = db.query(UserPlatform, Platform).filter(UserPlatform.platform_id == Platform.platform_id, UserPlatform.user_id == user_id).all()
+    res = []
+    for user_platform, platform in user_platforms:
+        res.append({
+            "platform_name": platform.name,
+            "account_id": user_platform.id,
+            "last_upload": user_platform.last_upload
+        })
+    return res
