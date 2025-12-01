@@ -2,24 +2,24 @@ from datetime import datetime
 from app.parsers.base import BaseRSSParser
 from app.models.schemas import ArticleSchema
 
-class VelogRSSParser(BaseRSSParser):
-    """Velog RSS 파서"""
+class TistoryRSSParser(BaseRSSParser):
+    """티스토리 RSS 파서"""
 
     def get_rss_url(self, account_id: str) -> str:
         """
-        Velog RSS URL 생성
+        티스토리 RSS URL 생성
 
         Args:
-            account_id: Velog username
+            account_id: 티스토리 블로그 ID
 
         Returns:
-            https://v2.velog.io/rss/@{username}
+            https://{blogId}.tistory.com/rss
         """
-        return f"https://v2.velog.io/rss/@{account_id}"
+        return f"https://{account_id}.tistory.com/rss"
 
     def normalize(self, entry) -> ArticleSchema:
         """
-        Velog RSS 엔트리를 ArticleSchema로 변환
+        티스토리 RSS 엔트리를 ArticleSchema로 변환
 
         Args:
             entry: feedparser entry object
@@ -28,14 +28,14 @@ class VelogRSSParser(BaseRSSParser):
             ArticleSchema
         """
         # 발행 시간 파싱
-        published_at = datetime(*entry.published_parsed[:6])
+        published_at = datetime(*entry.published_parsed[:6]).strftime("%Y-%m-%d")
 
         # 썸네일 추출
         thumbnail = None
-        if hasattr(entry, 'media_content') and entry.media_content:
-            thumbnail = entry.media_content[0].get('url')
+        if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+            thumbnail = entry.media_thumbnail[0].get('url')
 
-        # 태그 추출
+        # 카테고리를 태그로 사용
         tags = None
         if hasattr(entry, 'tags') and entry.tags:
             tags = [tag.term for tag in entry.tags]

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, ForeignKey, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID  # Postgres 전용 UUID 타입
 from app.dependencies.database import Base
+from pydantic import BaseModel
 import uuid
 
 
@@ -35,3 +36,10 @@ class POST_AGG(Base):
         primary_key=True,
     )
     count = Column(Integer, nullable=False)
+
+class Post(BaseModel):
+    url: str
+    category: str
+    date: str
+    title: str
+    platform: str

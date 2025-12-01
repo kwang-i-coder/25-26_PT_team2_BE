@@ -2,24 +2,24 @@ from datetime import datetime
 from app.parsers.base import BaseRSSParser
 from app.models.schemas import ArticleSchema
 
-class VelogRSSParser(BaseRSSParser):
-    """Velog RSS 파서"""
+class NaverRSSParser(BaseRSSParser):
+    """네이버 블로그 RSS 파서"""
 
     def get_rss_url(self, account_id: str) -> str:
         """
-        Velog RSS URL 생성
+        네이버 블로그 RSS URL 생성
 
         Args:
-            account_id: Velog username
+            account_id: 네이버 블로그 ID
 
         Returns:
-            https://v2.velog.io/rss/@{username}
+            https://rss.blog.naver.com/{blogId}.xml
         """
-        return f"https://v2.velog.io/rss/@{account_id}"
+        return f"https://rss.blog.naver.com/{account_id}.xml"
 
     def normalize(self, entry) -> ArticleSchema:
         """
-        Velog RSS 엔트리를 ArticleSchema로 변환
+        네이버 RSS 엔트리를 ArticleSchema로 변환
 
         Args:
             entry: feedparser entry object
@@ -28,14 +28,14 @@ class VelogRSSParser(BaseRSSParser):
             ArticleSchema
         """
         # 발행 시간 파싱
-        published_at = datetime(*entry.published_parsed[:6])
+        published_at = datetime(*entry.published_parsed[:6]).strftime("%Y-%m-%d")
 
-        # 썸네일 추출
+        # 썸네일 추출 (있으면)
         thumbnail = None
         if hasattr(entry, 'media_content') and entry.media_content:
             thumbnail = entry.media_content[0].get('url')
 
-        # 태그 추출
+        # 태그 추출 (있으면)
         tags = None
         if hasattr(entry, 'tags') and entry.tags:
             tags = [tag.term for tag in entry.tags]
