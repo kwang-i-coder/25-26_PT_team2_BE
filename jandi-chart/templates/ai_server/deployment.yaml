@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: ai-server
-        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/ai:latest # GKE 레지스트리 주소
+        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/ai_server:latest # GKE 레지스트리 주소
         ports:
         - containerPort: 8080 
         envFrom:

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: mail-server
-        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/mail:latest # GKE 레지스트리 주소
+        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/mail_server:latest # GKE 레지스트리 주소
         ports:
         - containerPort: 8080 
         envFrom:

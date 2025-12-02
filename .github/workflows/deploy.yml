@@ -16,9 +16,9 @@ jobs:
       fail-fast: false # 하나가 실패해도 나머지는 계속 진행
       matrix:
         service: 
-          - ai
+          - ai_server
           - frontend
-          - mail
+          - mail_server
           - main_server
           - post_observer
 
