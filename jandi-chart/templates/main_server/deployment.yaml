@@ -16,8 +16,7 @@ spec:
     spec:
       containers:
       - name: main-server
-        image: us-central1-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/main:latest
-
+        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/main_server:latest # GKE 레지스트리 주소
         ports:
         - containerPort: 8080 
         envFrom:
