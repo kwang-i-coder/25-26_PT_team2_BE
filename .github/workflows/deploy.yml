@@ -3,6 +3,7 @@ name: Build and Push 5 Services to GCR
 on:
   push:
     branches: [ "main" ]
+    branches : ["feat/deploy-to-gcr"]
 
 env:
   PROJECT_ID: calm-scarab-478705-c7  # [변경필요] 본인의 GCP 프로젝트 ID로 꼭 변경하세요!
@@ -41,7 +42,7 @@ jobs:
     # 4. Docker가 GCR에 접근할 수 있도록 인증 설정
     - name: 'Configure Docker'
       run: |
-        gcloud auth configure-docker
+        gcloud auth configure-docker asia-northeast3-docker.pkg.dev
 
     # 5. 각 서비스별 빌드 및 푸시
     # - context: ./${{ matrix.service }} (각 폴더 안의 Dockerfile을 사용)
@@ -49,7 +50,8 @@ jobs:
     - name: 'Build and Push ${{ matrix.service }}'
       run: |
         # 이미지 주소 변수 설정
-        IMAGE_URI="gcr.io/${{ env.PROJECT_ID }}/${{ matrix.service }}"
+        IMAGE_URI="asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/${{ matrix.service }}"
+        
         
         echo "Building $IMAGE_URI from ./${{ matrix.service }}..."
         
