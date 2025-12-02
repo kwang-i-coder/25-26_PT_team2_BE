@@ -16,11 +16,10 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: gcr.io/프로젝트ID/frontend:latest # GKE 레지스트리 주소
+        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/frontend:latest 
         ports:
         - containerPort: 8080 
         envFrom:
         - secretRef:
-            # 이전에 생성한 Secret의 이름으로 바꿔주세요.
             name: jandi-secret
       
