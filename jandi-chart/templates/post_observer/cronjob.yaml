@@ -11,8 +11,7 @@ spec:
           containers:
           - name: post-observer
             image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/post_observer:latest # GKE 레지스트리 주소
-            # 필요한 경우 환경변수 추가
             envFrom:
             - secretRef:
                   name: jandi-secret
-          restartPolicy: OnFailure # 실패 시 재시도
+          restartPolicy: OnFailure 

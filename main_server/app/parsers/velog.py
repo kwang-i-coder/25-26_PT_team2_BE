@@ -28,7 +28,7 @@ class VelogRSSParser(BaseRSSParser):
             ArticleSchema
         """
         # 발행 시간 파싱
-        published_at = datetime(*entry.published_parsed[:6])
+        published_at = datetime(*entry.published_parsed[:6]).strftime("%Y-%m-%d")
 
         # 썸네일 추출
         thumbnail = None

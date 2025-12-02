@@ -21,16 +21,58 @@
         .empty-cell { width: 20px; height: 20px; }
         
         /* 토픽별 색상 */
-        .tech { background-color: #4285F4; }
-        .life { background-color: #34A853; }
-        .travel { background-color: #A600FF; }
-        .food { background-color: #FF6D01; }
-        .review { background-color: #EA4335; }
-        .gold { background-color: rgb(208, 192, 138); }
-        
-        .legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #555; padding-top: 48px; }
+        .tech { background-color: #F28B82; }
+        .life { background-color: #F4EFE6; }
+        .travel { background-color: #D6E0E2; }
+        .food { background-color: #FFCB9E; }
+        .review { background-color: #F2B6A8; }
+        .gold {
+            /* 빛 반사 효과를 위한 그라데이션 */
+            background: linear-gradient(135deg, #ffd700 0%, #fdb931 50%, #d4af37 100%);
+            /* 테두리를 살짝 주어 보석 같은 느낌 추가 */
+            border: 1px solid #cba434; 
+        }        
+        .legend { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: #555; padding-top: 48px; }
         .legend-item { display: flex; align-items: center; gap: 8px; }
         .legend-color { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+
+/* --- [추가됨] 커스텀 툴팁 스타일 --- */
+        .custom-tooltip {
+            position: absolute;
+            background-color: #1f2937; /* 다크 그레이 */
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none; /* 마우스 이벤트가 툴팁을 통과하도록 설정 */
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(10px);
+        }
+        .custom-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .tooltip-date {
+            color: #9ca3af; /* 연한 회색 */
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        .tooltip-count {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
 
         @media (max-width: 600px) {
             .content-wrapper { flex-direction: column; align-items: center; gap: 30px; }
@@ -51,11 +93,12 @@
             </div>
 
             <div class="legend">
-                <div class="legend-item"><div class="legend-color tech"></div>기술/개발</div>
                 <div class="legend-item"><div class="legend-color life"></div>일상/라이프</div>
                 <div class="legend-item"><div class="legend-color travel"></div>여행</div>
                 <div class="legend-item"><div class="legend-color food"></div>음식/맛집</div>
                 <div class="legend-item"><div class="legend-color review"></div>리뷰</div>
+                <div class="legend-item"><div class="legend-color tech"></div>기술/개발</div>
+                <div class="legend-item"><div class="legend-color gold"></div>7일 연속 작성</div>
             </div>
         </div>
     </div>
@@ -97,17 +140,50 @@
                 for (let i = 29; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(today.getDate() - i);
+                    
+                    // 툴팁에 쓰기 위해 연/월/일 숫자를 따로 저장
                     const year = d.getFullYear();
                     const month = String(d.getMonth() + 1).padStart(2, '0');
                     const day = String(d.getDate()).padStart(2, '0');
                     const dateStr = `${year}-${month}-${day}`;
 
-                    const matchedData = apiData.find(item => item.date === dateStr);
+                    // 같은 날짜의 글들을 모두 찾아 합치기
+                    const matchedItems = apiData.filter(item => item.date === dateStr);
+                    const totalCount = matchedItems.reduce((acc, curr) => acc + curr.count, 0);
+                    
+                    let mainTopic = null;
+                    if (matchedItems.length > 0) {
+                        const sortedItems = matchedItems.sort((a, b) => b.count - a.count);
+                        mainTopic = sortedItems[0].topic;
+                    }
+
                     fullData.push({
                         date: dateStr,
-                        topic: matchedData ? matchedData.topic : null,
-                        count: matchedData ? matchedData.count : 0
+                        topic: mainTopic,
+                        count: totalCount,
+                        year: year,       // 툴팁용
+                        month: parseInt(month), // 툴팁용 (01 -> 1)
+                        day: parseInt(day)      // 툴팁용 (05 -> 5)
                     });
+                }
+
+                // 7일 연속 작성 시 Gold로 변환 (금잔디 로직)
+                let streakIndices = [];
+
+                for (let i = 0; i < fullData.length; i++) {
+                    if (fullData[i].count > 0) {
+                        streakIndices.push(i);
+                    } else {
+                        if (streakIndices.length >= 7) {
+                            streakIndices.forEach(index => fullData[index].topic = 'Gold');
+                        }
+                        streakIndices = [];
+                    }
+                }
+
+                // 마지막 날까지 연속인 경우 처리
+                if (streakIndices.length >= 7) {
+                    streakIndices.forEach(index => fullData[index].topic = 'Gold');
                 }
                 return fullData;
             }
@@ -155,10 +231,42 @@
                 grassData.forEach(day => {
                     const dayCell = document.createElement('div');
                     const topicClass = day.topic ? day.topic.toLowerCase() : ''; 
+
+                    
                     dayCell.className = `day-cell ${topicClass}`;
-                    const dayOfWeek = new Date(day.date).getDay();
-                    const topicText = day.topic ? ` - ${day.topic}` : ' - 활동 없음';
-                    dayCell.title = `${day.date} (${WEEKDAYS[dayOfWeek]})` + topicText;
+
+
+
+                    // --- 툴팁 이벤트 리스너 추가 ---
+                    dayCell.addEventListener('mouseenter', (e) => {
+                        // 1. 툴팁 내용 설정 (날짜와 개수만 표시)
+                        const topicColor = day.topic ? getComputedStyle(dayCell).backgroundColor : '#ebedf0';
+                        const countText = day.count > 0 ? `${day.count}개의 글` : '글 없음';
+                        
+                        tooltip.innerHTML = `
+                            <div class="tooltip-date">${day.year}년 ${day.month}월 ${day.day}일</div>
+                            <div style="display:flex; align-items:center;">
+                                <span class="dot" style="background-color: ${day.count > 0 ? topicColor : '#9ca3af'}"></span>
+                                <span class="tooltip-count">${countText}</span>
+                            </div>
+                        `;
+
+                        // 2. 툴팁 위치 계산 (셀 바로 위)
+                        const rect = dayCell.getBoundingClientRect();
+                        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                        
+                        // 툴팁을 셀의 중앙 상단에 위치시킴
+                        tooltip.style.left = `${rect.left + scrollLeft - (tooltip.offsetWidth / 2) + (rect.width / 2)}px`;
+                        tooltip.style.top = `${rect.top + scrollTop - tooltip.offsetHeight - 10}px`;
+                        
+                        tooltip.classList.add('visible');
+                    });
+
+                    dayCell.addEventListener('mouseleave', () => {
+                        tooltip.classList.remove('visible');
+                    });
+
                     grassBoard.appendChild(dayCell);
                 });
             };

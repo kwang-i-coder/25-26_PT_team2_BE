@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends
+from typing import List
 from sqlalchemy.orm import Session 
 from app.dependencies.database import get_db
 from app.dependencies.verify_jwt import get_current_user_id
-from app.models.user_models import UserStat, UserStatResponse
+from app.models.user_models import UserStat, UserStatResponse, Platform
+from app.models.post_models import Post, Posts
 from datetime import datetime, date
 
 router = APIRouter(prefix='/api/user')
@@ -24,3 +26,15 @@ def get_user_stats(
             created_at=user_stats[0].created_at,
             count=sum(stat.count for stat in user_stats)
         )
+
+@router.get("/posts", response_model=list[Post])
+def get_user_posts(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    category: str | None = None
+):
+    if category is None:
+        posts: list[Post] = db.query(Posts, Platform).filter(Posts.user_id == user_id, Posts.platform_id == Platform.platform_id).all()
+    else:
+        posts: list[Post] = db.query(Posts, Platform).filter(Posts.user_id == user_id, Posts.category == category, Posts.platform_id == Platform.platform_id).all()
+    return map(lambda row: Post(url=row[0].url, category=row[0].category, date=row[0].date.strftime("%Y-%m-%d"), title=row[0].title, platform=row[1].name), posts)

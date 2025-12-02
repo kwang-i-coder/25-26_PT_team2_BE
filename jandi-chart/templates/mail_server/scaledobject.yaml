@@ -5,14 +5,14 @@ metadata:
   namespace: default
 spec:
   scaleTargetRef:
-    name: mail-server  # deployment.yaml에 적힌 metadata.name과 똑같아야 함!
-  minReplicaCount: 0       # 메시지 없으면 0개 (비용 절감)
-  maxReplicaCount: 2       # 최대 5개
+    name: mail-server  
+  minReplicaCount: 0     
+  maxReplicaCount: 2      
   triggers:
   - type: rabbitmq
     metadata:
-      queueName: mail_reminders # 코드에서 쓰는 큐 이름
+      queueName: mail_reminders 
       mode: QueueLength
       value: "1"
     authenticationRef:
-      name: keda-trigger-auth   # 아래 설명할 인증 연결
+      name: keda-trigger-auth  
