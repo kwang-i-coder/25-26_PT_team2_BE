@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: main-server-service # [중요 1] 나중에 Ingress가 이 이름을 찾습니다.
 spec:
-  type: ClusterIP      # 외부 노출 없이 내부에서만 통신 (Ingress가 연결해줄 것이므로)
+  type: NodePort     # 외부 노출 없이 내부에서만 통신 (Ingress가 연결해줄 것이므로)
   selector:
     app: main-server   # [중요 2] Deployment의 라벨과 똑같아야 연결됨!
   ports:
