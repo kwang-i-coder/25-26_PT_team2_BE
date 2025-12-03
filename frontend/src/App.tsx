@@ -1,120 +1,74 @@
-import React, { useState, useEffect } from "react";
-import "./App.css";
+import { useEffect, useState } from 'react';
+import { OnboardingPage } from './components/OnboardingPage';
+import { LoginPage } from './components/LoginPage';
+import { SignupPage } from './components/SignupPage';
+import { DashboardPage } from './components/DashboardPage';
+import { removeToken, setToken, getToken, api } from './utils/api';
 
-type TopicType = "tech" | "life" | "travel" | "food" | "review" | null;
-interface DayData {
-  date: string;
-  topic: TopicType;
-}
-
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
-function App() {
-  const [grassData, setGrassData] = useState<DayData[]>([]);
+export default function App() {
+  const [currentPage, setCurrentPage] = useState<'onboarding' | 'login' | 'signup' | 'dashboard'>('onboarding');
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
-    // Axios 대신 fetch 사용 (환경 호환성 위함)
-    fetch("/mock_grass.json")
-      .then((res) => {
-        if (!res.ok) throw new Error("No file");
-        return res.json();
-      })
-      .then((data) => setGrassData(data))
-      .catch(() => {
-        console.warn("파일 로드 실패. 비상용 데이터 생성");
-        const today = new Date();
-        const fallbackDays: DayData[] = [];
-        // 5주치 데이터 생성
-        for (let i = 0; i < 35; i++) {
-          const d = new Date();
-          d.setDate(today.getDate() - (34 - i));
-          const dateStr = d.toISOString().split("T")[0];
-          // 랜덤 토픽 생성
-          const randomTopic =
-            Math.random() > 0.3
-              ? (["tech", "life", "travel", "food", "review"][
-                  Math.floor(Math.random() * 5)
-                ] as TopicType)
-              : null;
-          fallbackDays.push({ date: dateStr, topic: randomTopic });
-        }
-        setGrassData(fallbackDays);
-      });
+    const token = getToken();
+    const storedEmail = localStorage.getItem('userEmail');
+
+    if (token && storedEmail) {
+      setUserEmail(storedEmail);
+      setCurrentPage('dashboard');
+    }
   }, []);
 
-  const getMonthRange = () => {
-    if (grassData.length === 0) return "";
-    const startMonth = parseInt(grassData[0].date.split("-")[1], 10);
-    const endMonth = parseInt(
-      grassData[grassData.length - 1].date.split("-")[1],
-      10
-    );
-    return startMonth === endMonth
-      ? `${startMonth}월`
-      : `${startMonth}월 ~ ${endMonth}월`;
+  const handleStartOnboarding = () => {
+    setCurrentPage('login');
   };
 
-  const getStartDayOffset = () => {
-    if (grassData.length === 0) return 0;
-    return new Date(grassData[0].date).getDay();
+  const handleGoToSignup = () => {
+    setCurrentPage('signup');
+  };
+
+  const handleBackToLogin = () => {
+    setCurrentPage('login');
+  };
+
+  const handleSignup = (email: string, name: string) => {
+    setUserEmail(email);
+    setCurrentPage('dashboard');
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const response = await api.signin(email, password);
+      setToken(response.access_token);
+      setUserEmail(email);
+      localStorage.setItem('userEmail', email);
+      setCurrentPage('dashboard');
+    } catch (error) {
+      alert('로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+    }
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    localStorage.removeItem('userEmail');
+    setCurrentPage('login');
+    setUserEmail('');
   };
 
   return (
-    <>
-      <div className="container">
-        <h2>나의 블로그 활동</h2>
-
-        <div className="content-wrapper">
-          <div className="board-column">
-            <div className="month-label">{getMonthRange()}</div>
-
-            <div className="week-header">
-              {WEEKDAYS.map((day) => (
-                <div key={day} className="weekday">
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            <div className="grass-board">
-              {/* 수정된 부분: (a -> ( 오타 제거 */}
-              {Array.from({ length: getStartDayOffset() }).map((_, i) => (
-                <div key={`empty-${i}`} className="empty-cell" />
-              ))}
-
-              {grassData.map((day, index) => (
-                <div
-                  key={index}
-                  className={`day-cell ${day.topic || ""}`}
-                  title={`${day.date} (${
-                    WEEKDAYS[new Date(day.date).getDay()]
-                  })`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="legend">
-            <div className="legend-item">
-              <div className="legend-color tech"></div>기술/개발
-            </div>
-            <div className="legend-item">
-              <div className="legend-color life"></div>일상/라이프
-            </div>
-            <div className="legend-item">
-              <div className="legend-color travel"></div>여행
-            </div>
-            <div className="legend-item">
-              <div className="legend-color food"></div>음식/맛집
-            </div>
-            <div className="legend-item">
-              <div className="legend-color review"></div>리뷰
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {currentPage === 'onboarding' && (
+        <OnboardingPage onStart={handleStartOnboarding} />
+      )}
+      {currentPage === 'login' && (
+        <LoginPage onLogin={handleLogin} onGoToSignup={handleGoToSignup} />
+      )}
+      {currentPage === 'signup' && (
+        <SignupPage onSignup={handleSignup} onBackToLogin={handleBackToLogin} />
+      )}
+      {currentPage === 'dashboard' && (
+        <DashboardPage userEmail={userEmail} onLogout={handleLogout} />
+      )}
+    </div>
   );
 }
-
-export default App;

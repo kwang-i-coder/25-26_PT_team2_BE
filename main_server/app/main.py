@@ -7,6 +7,7 @@ from .models import user_models, post_models
 from .routers.platform_router import router as platform_router 
 from .routers.jandi_router import router as jandi_router
 from .routers.user_router import router as user_router
+from .routers.ui import router as ui_router
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -26,6 +27,7 @@ app.include_router(router=auth_router)
 app.include_router(router=jandi_router)
 app.include_router(router=platform_router)
 app.include_router(user_router)
+app.include_router(ui_router)
 
 get_db()
 

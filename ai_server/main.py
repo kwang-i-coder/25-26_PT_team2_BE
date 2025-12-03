@@ -9,6 +9,7 @@ from service import consume_message_queue, refresh_materialized_view
 from dependencies.database import Base, engine
 from models.models import Posts
 from pika.channel import Channel
+from threading import Thread
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,9 +26,6 @@ logging.basicConfig(
 
 total_article_count = 0
 current_article_count = 0
-
-# 플랫폼 등록 작업 별 {"total_count": 0, "current_count": 0} 형태로 저장
-platform_register_map={}
 
 # 오타 방지
 class Channels(Enum):
@@ -98,6 +96,7 @@ def callback_refresh(ch: Channel, method, properties, body):
 
     try:
         msg_type = data.get('type')
+        logger.info(f"Processing message type: {msg_type}")
 
         if msg_type == 'init':
             total_article_count = data['count']
@@ -105,19 +104,9 @@ def callback_refresh(ch: Channel, method, properties, body):
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
-        if msg_type == 'init_platform_register':
-            platform_register_map[data['user_id']] = {"platform": data['platform'], "total_count": data['count'], "current_count": 0}
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-            return
-
-        if msg_type == 'progress_platform_register':
-            user_id = data['user_id']
-            if user_id not in platform_register_map:
-                logger.warning(f"User ID {user_id} not found in platform_register_map. Ignoring progress update.")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-                return
-
             platform_register_map[user_id]['current_count'] += 1
+            logger.info(f"Current article count: {platform_register_map[user_id]['current_count']}")
+            logger.info(f"Total article count: {platform_register_map[user_id]['total_count']}")
             if platform_register_map[user_id]['current_count'] == platform_register_map[user_id]['total_count']:
                 platform_register_map.pop(user_id)
                 refresh_materialized_view()
@@ -143,13 +132,17 @@ def callback_platform_register(ch: Channel, method, properties, body):
     data = json.loads(body)
     logger.info(f"Received message: {data}")
     try:
-        consume_message_queue(data['link'], data['user_id'], data['platform'], data['published_at'])
-        publish_platform_register_progress(ch, data['user_id'],data['platform'])
+        threads = []
+        for article in data:
+            thread = Thread(target=consume_message_queue, args=(article['link'], article['user_id'], article['platform'], article['published_at']))
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
+        refresh_materialized_view()
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
         logger.error(f"Failed to process message(platform_register): {e}")
-        # 실패한 경우라도 카운팅은 해야하니 publish_progress(ch)를 호출
-        publish_platform_register_progress(ch, data['user_id'],data['platform'])
         ch.basic_nack(delivery_tag=method.delivery_tag)
         return
 

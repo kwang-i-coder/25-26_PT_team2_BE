@@ -54,7 +54,7 @@ def start_consumer(rabbitmq_url:str, queue_name: str, callback_function):
         channel.basic_qos(prefetch_count=1)
 
         # 큐 선언
-        channel.queue_declare(queue=queue_name, durable = True)
+        channel.queue_declare(queue=queue_name, durable = False)
 
         #콜백 함수 등록하고 소비시작
         channel.basic_consume(queue_name,

@@ -5,7 +5,17 @@ from app.dependencies.verify_jwt import get_current_user_id
 from app.models.jandi_models import GetJandiResponse
 from app.models.post_models import POST_AGG
 from datetime import datetime, timedelta
+from pydantic import BaseModel
+from fastapi import APIRouter
+import os
+import jwt
+import dotenv
 router = APIRouter(prefix='/api/jandi')
+
+dotenv.load_dotenv()
+
+UI_SECRET_KEY = os.getenv("UI_SECRET_KEY", "my_super_secret_key")
+ALGORITHM = "HS256"
 
 @router.get("/", response_model=list[GetJandiResponse])
 async def get_jandi(date: str | None = None,db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
@@ -20,3 +30,17 @@ async def get_jandi(date: str | None = None,db: Session = Depends(get_db), user_
     # 그걸 [GetJandiResponse]로 변환
     response = [GetJandiResponse(date=post.date.strftime("%Y-%m-%d"), topic=post.category, count=post.count) for post in posts]
     return response
+
+class GetSignedUrlRequest(BaseModel):
+    url: str
+
+@router.get("/signedUrl", response_model=GetSignedUrlRequest)
+async def get_signed_url(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="인증 헤더가 필요합니다.")
+    verify_token = jwt.encode(
+        {"sub": str(user_id)},
+        UI_SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+    return {"url": f"http://localhost:8000/jandi?token={verify_token}"}

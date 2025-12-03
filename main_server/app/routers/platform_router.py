@@ -12,6 +12,7 @@ from app.parsers.velog import VelogRSSParser
 from app.parsers.naver import NaverRSSParser
 from app.parsers.tistory import TistoryRSSParser
 from app.dependencies.rabbitmq import publish_message
+import time
 router = APIRouter(
     prefix="/api/platform",
     tags=["Platform"]
@@ -56,16 +57,17 @@ def register_platform(
     db.commit()
 
     articles = platform_register_map[req.platform_name].parse(req.account_id)
-    if articles:
-        publish_message("refresh", {"type": "init_platform_register", "platform": req.platform_name, "count": len(articles), "user_id": user_id})
-        for article in articles:
-            publish_message("platform_register", {
-                "link": article.link,
-                "published_at": article.published_at,
-                "title": article.title,
-                "user_id": user_id,
-                "platform": req.platform_name
-            })
+    data = []
+    for article in articles:
+        data.append({
+            "link": article.link,
+            "published_at": article.published_at,
+            "title": article.title,
+            "user_id": user_id,
+            "platform": req.platform_name
+        })
+
+    publish_message("platform_register", data)
 
     return {
         "message": message

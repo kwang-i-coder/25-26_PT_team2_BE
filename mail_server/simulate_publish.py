@@ -51,7 +51,7 @@ def publish_mock_message():
         channel = connection.channel()
 
         # 2. 큐 선언 (Consumer와 동일한 설정 유지)
-        channel.queue_declare(queue=MAIL_QUEUE, durable=True)
+        channel.queue_declare(queue=MAIL_QUEUE, durable=False)
         
         # 3. 메시지 준비 및 발행
         message_body = json.dumps(TEST_USER_DATA)

@@ -15,29 +15,27 @@ services:
   #     - rabbitmq_data:/var/lib/rabbitmq
 
   main-server:
-    build: ./main_server 
+    build: ./main_server
     container_name: jandi-main-server
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     env_file:
       - .env
-  # 프론트엔드 서비스 빌드할 때 에러가 나는 것 같습니다. 추후 해결하고 주석 풀어야할 것 같아요
-  # frontend:
-  #   build: ./frontend
-  #   container_name: jandi-frontend
-  #   command: npm start
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - main-server
-  #   env_file:
-  #     - .env
+  frontend:
+    build: ./frontend
+    container_name: jandi-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - main-server
+    env_file:
+      - .env
 
   post-observer:
-    build: ./post_observer 
+    build: ./post_observer
     container_name: jandi-observer
-    command: python3 -u main.py #test_publish_new_posts.py
+    command: python3 -u main.py
     depends_on:
       - ai-server
     env_file:
@@ -56,7 +54,6 @@ services:
     command: python3 -u main.py
     env_file:
       - .env
-
 
 # 데이터 영구 저장을 위한 볼륨 정의
 volumes:

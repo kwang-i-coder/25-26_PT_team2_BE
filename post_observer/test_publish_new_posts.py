@@ -10,9 +10,9 @@ load_dotenv()
 connection = get_rabbitmq_connection()
 
 channel = connection.channel()
-channel.queue_purge("new_posts")
-channel.queue_purge("refresh")
-channel.queue_purge("platform_register")
+# channel.queue_purge("new_posts")
+# channel.queue_purge("refresh")
+# channel.queue_purge("platform_register")
 
 # test_data = []
 # test_user_id = "217de718-65e4-432c-8e27-ffc7b3a751cf"
