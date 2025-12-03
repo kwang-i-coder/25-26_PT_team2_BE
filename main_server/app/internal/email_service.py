@@ -15,7 +15,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")            
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")   
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = "http://136.110.239.66"
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER)  
 
 async def send_verification_email(email: str, token: str) -> None:
