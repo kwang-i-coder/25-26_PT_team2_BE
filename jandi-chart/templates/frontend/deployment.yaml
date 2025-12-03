@@ -16,9 +16,10 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/frontend:latest 
+        image: asia-northeast3-docker.pkg.dev/calm-scarab-478705-c7/jandi-images-repo/frontend:latest
+        imagePullPolicy: Always 
         ports:
-        - containerPort: 8080 
+        - containerPort: 3000
         envFrom:
         - secretRef:
             name: jandi-secret
