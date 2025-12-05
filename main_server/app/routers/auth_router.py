@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime, timedelta
 import jwt
 import os
@@ -111,6 +112,8 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
     shadow.is_verified = True
     shadow.verification_token = None
+    db.commit()
+    db.execute(text('REFRESH MATERIALIZED VIEW "USER_STAT"'))
     db.commit()
 
     return {"message": "이메일 인증 완료!"}
